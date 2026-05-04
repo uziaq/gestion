@@ -3,6 +3,70 @@
 // (Refonte modulaire de gestion.html, source AREPROG)
 // ============================================================
 
+// ── Filtrage par période (calendaire ou glissante) ──────────
+// raw = chaîne du select : "month"/"quarter"/"year" (calendaire civil)
+//                          "prev_month"/"prev_quarter"/"prev_year" (période civile précédente)
+//                          "7"/"30"/"90"/"365" (jours glissants)
+function filterByPeriod(docs, raw) {
+  if (!raw) return docs;
+  var now = new Date();
+  var start, end;
+  if (raw === 'month') {
+    start = new Date(now.getFullYear(), now.getMonth(), 1);
+    end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  } else if (raw === 'prev_month') {
+    start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+  } else if (raw === 'quarter') {
+    var q = Math.floor(now.getMonth() / 3);
+    start = new Date(now.getFullYear(), q * 3, 1);
+    end = new Date(now.getFullYear(), q * 3 + 3, 0, 23, 59, 59, 999);
+  } else if (raw === 'prev_quarter') {
+    var pq = Math.floor(now.getMonth() / 3) - 1;
+    var py = now.getFullYear();
+    if (pq < 0) { pq = 3; py -= 1; }
+    start = new Date(py, pq * 3, 1);
+    end = new Date(py, pq * 3 + 3, 0, 23, 59, 59, 999);
+  } else if (raw === 'year') {
+    start = new Date(now.getFullYear(), 0, 1);
+    end = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
+  } else if (raw === 'prev_year') {
+    start = new Date(now.getFullYear() - 1, 0, 1);
+    end = new Date(now.getFullYear() - 1, 11, 31, 23, 59, 59, 999);
+  } else {
+    var days = parseInt(raw) || 0;
+    if (!days) return docs;
+    start = new Date(Date.now() - days * 86400000);
+    end = new Date();
+  }
+  return docs.filter(function(d) {
+    if (!d.date) return false;
+    var t = new Date(d.date).getTime();
+    return t >= start.getTime() && t <= end.getTime();
+  });
+}
+
+// Libellé humain d'une période (pour affichage)
+function periodLabel(raw) {
+  var now = new Date();
+  var months = ['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
+  if (raw === 'month') return months[now.getMonth()] + ' ' + now.getFullYear();
+  if (raw === 'prev_month') {
+    var d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    return months[d.getMonth()] + ' ' + d.getFullYear();
+  }
+  if (raw === 'quarter') return 'T' + (Math.floor(now.getMonth()/3)+1) + ' ' + now.getFullYear();
+  if (raw === 'prev_quarter') {
+    var pq = Math.floor(now.getMonth()/3) - 1, py = now.getFullYear();
+    if (pq < 0) { pq = 3; py -= 1; }
+    return 'T' + (pq+1) + ' ' + py;
+  }
+  if (raw === 'year') return 'Année ' + now.getFullYear();
+  if (raw === 'prev_year') return 'Année ' + (now.getFullYear()-1);
+  var days = parseInt(raw) || 0;
+  if (days) return days + ' derniers jours';
+  return 'Toute période';
+}
 
 // ============================================================
 //  APERÇU / PRINT
@@ -201,7 +265,7 @@ function renderListe() {
   var all = loadDocs();
   var flt        = $('flt') ? $('flt').value : '';
   var fltStatut  = $('flt-statut') ? $('flt-statut').value : '';
-  var fltPeriod  = $('flt-period') ? parseInt($('flt-period').value) : 0;
+  var fltPeriodRaw = $('flt-period') ? $('flt-period').value : '';
   var docs = all;
   if (flt) docs = docs.filter(function(d){ return d.type === flt; });
   if (fltStatut) {
@@ -211,9 +275,8 @@ function renderListe() {
       docs = docs.filter(function(d){ return d.statut === fltStatut; });
     }
   }
-  if (fltPeriod) {
-    var cutoff = Date.now() - fltPeriod * 86400000;
-    docs = docs.filter(function(d){ return new Date(d.date).getTime() >= cutoff; });
+  if (fltPeriodRaw) {
+    docs = filterByPeriod(docs, fltPeriodRaw);
   }
   updateListeFilterCounts();
   var countInfo = docs.length !== all.length
@@ -323,10 +386,12 @@ function openAddClientModal(fromCarnet) {
 }
 function closeAddClientModal() { $('add-client-modal').classList.remove('open'); }
 
+// FIX bug : ferme le carnet-modal d'abord pour éviter empilement de modaux
 function editClient(cid) {
   var cl = loadClients().find(function(c){ return c.id === cid; });
   if (!cl) return;
   editClientId = cid;
+  closeCarnetModal();
   $('add-client-title').textContent = 'Modifier le client';
   $('ac-nom').value = cl.nom || '';
   $('ac-tel').value = cl.tel || '';
@@ -338,6 +403,7 @@ function editClient(cid) {
   if (vehList) {
     vehList.innerHTML = '';
     var clVehs = cl.vehs && cl.vehs.length ? cl.vehs : (cl.vm ? [{vm:cl.vm,vmo:cl.vmo||'',vmot:cl.vmot||'',van:cl.van||'',vim:cl.vim||''}] : []);
+    if (clVehs.length === 0) clVehs = [{}]; // au moins une ligne vide
     clVehs.forEach(function(v){ addVehicleRow(v); });
   }
   $('add-client-modal').classList.add('open');
@@ -410,20 +476,34 @@ function selectClientAndGo(cid) {
   showTab('form');
 }
 
-// Enregistrer client depuis le formulaire courant
+// FIX bug : sauvegarde aussi le tableau vehs[] (pas juste les champs legacy vm/vmo/...)
+// Préserve les véhicules existants si update + ajoute le véhicule courant si non dupliqué
 function saveCurrentClientToCarnet() {
   var nom = $('f-cnom').value.trim();
   if (!nom) { alert('Renseignez le nom du client d\'abord.'); return; }
   var clients = loadClients();
-  // Chercher si déjà existant (même nom)
   var existing = clients.find(function(c){ return c.nom.toLowerCase() === nom.toLowerCase(); });
   if (existing && !confirm('Un client "' + nom + '" existe déjà. Mettre à jour ?')) return;
+  var currentVeh = {
+    vm: $('f-vm').value, vmo: $('f-vmo').value, vmot: $('f-vmot').value,
+    van: $('f-van').value, vim: $('f-vim').value
+  };
+  var hasVeh = currentVeh.vm || currentVeh.vmo || currentVeh.vim;
+  var vehs = (existing && existing.vehs && existing.vehs.length) ? existing.vehs.slice() : [];
+  if (hasVeh) {
+    var dup = vehs.find(function(v){
+      return (currentVeh.vim && v.vim && v.vim.toUpperCase() === currentVeh.vim.toUpperCase())
+          || (!currentVeh.vim && v.vm === currentVeh.vm && v.vmo === currentVeh.vmo);
+    });
+    if (!dup) vehs.push(currentVeh);
+  }
   var cl = {
     id: existing ? existing.id : Date.now(),
     nom: nom, tel: $('f-ctel').value, email: $('f-cemail').value,
     adr: $('f-cadr').value, ville: $('f-cville').value,
-    vm: $('f-vm').value, vmo: $('f-vmo').value, vmot: $('f-vmot').value,
-    van: $('f-van').value, vim: $('f-vim').value,
+    vm: currentVeh.vm, vmo: currentVeh.vmo, vmot: currentVeh.vmot,
+    van: currentVeh.van, vim: currentVeh.vim,
+    vehs: vehs,
   };
   if (existing) {
     var i = clients.indexOf(existing);
@@ -468,7 +548,6 @@ function prefillGains() {
   } else {
     $('f-gains').value = '';
     previewGainsBadge();
-    // Feedback
     var btn = event.currentTarget;
     btn.textContent = 'Aucun gain trouvé';
     setTimeout(function(){ btn.textContent = '↺ Auto'; }, 1500);
@@ -499,7 +578,6 @@ function importOlsxGains() {
   if (!olsxDetected) return;
   currentGains = olsxDetected;
   renderGainsBar();
-  // Ajouter les gains numériques OLSX dans f-gains
   var g = olsxDetected;
   var parts = [];
   if (g.chOrig && g.ch) parts.push(g.chOrig + ' ch → ' + g.ch + ' ch (+' + (g.ch - g.chOrig) + ' ch)');
@@ -538,11 +616,8 @@ function renderGainsBar() {
 
 // Écouter les messages postMessage de l'iframe OLSX
 window.addEventListener('message', function(e) {
-  // OLSX envoie les données de gain via postMessage
   if (!e.data) return;
   var d = e.data;
-  // Format OLSX : { type: 'olsx_data', ch: 220, chOrig: 180, nm: 380, nmOrig: 320, ... }
-  // ou format alternatif selon la version de l'API
   if (d.type === 'olsx_data' || d.ch || d.power || d.horsepower) {
     olsxDetected = {
       ch:     d.ch || d.power || d.horsepower || null,
@@ -552,7 +627,6 @@ window.addEventListener('message', function(e) {
       conso:  d.conso || d.consumption || null,
       raw:    d
     };
-    // Construire le preview
     var parts = [];
     if (olsxDetected.chOrig && olsxDetected.ch) parts.push(olsxDetected.chOrig + '→' + olsxDetected.ch + ' ch');
     if (olsxDetected.nmOrig && olsxDetected.nm) parts.push(olsxDetected.nmOrig + '→' + olsxDetected.nm + ' Nm');
@@ -566,14 +640,10 @@ window.addEventListener('message', function(e) {
 });
 
 // ============================================================
-//  TABS (mis à jour avec carnet)
-// ============================================================
-
-// ============================================================
 //  GESTIONNAIRE CATALOGUE
 // ============================================================
-var catEditingGroup = null;   // index groupe en cours d'édition
-var catEditingItem  = null;   // index item en cours d'édition
+var catEditingGroup = null;
+var catEditingItem  = null;
 
 function renderCatEditor() {
   var cat = loadCat();
@@ -626,20 +696,16 @@ function escHtml(str) {
   return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// ── Édition item ─────────────────────────────────────────────
 function openCatModal(gi, ii) {
   catEditingGroup = gi;
   catEditingItem  = ii;
   var cat = loadCat();
   var isNew = ii === null;
   $('cat-modal-title').textContent = isNew ? 'Nouveau service' : 'Modifier le service';
-
-  // Remplir le select des groupes
   var sel = $('cat-item-group');
   sel.innerHTML = cat.map(function(grp, i) {
     return '<option value="' + i + '"' + (i === gi ? ' selected' : '') + '>' + escHtml(grp.g) + '</option>';
   }).join('');
-
   if (!isNew) {
     var it = cat[gi].items[ii];
     $('cat-item-label').value = it.l;
@@ -655,7 +721,6 @@ function openCatModal(gi, ii) {
 }
 
 function closeCatModal() { $('cat-item-modal').classList.remove('open'); }
-
 function addCatItem(gi) { openCatModal(gi, null); }
 function editCatItem(gi, ii) { openCatModal(gi, ii); }
 
@@ -665,15 +730,11 @@ function saveCatItem() {
   var price = parseFloat($('cat-item-price').value) || 0;
   var targetGroup = parseInt($('cat-item-group').value);
   var cat = loadCat();
-
   var gainsRaw = ($('cat-item-gains').value || '').split('\n').map(function(g){ return g.trim(); }).filter(Boolean);
   var item = { l: label, p: price, gains: gainsRaw };
-
   if (catEditingItem === null) {
-    // Nouveau
     cat[targetGroup].items.push(item);
   } else {
-    // Modifier — gérer le changement de groupe
     if (targetGroup === catEditingGroup) {
       cat[catEditingGroup].items[catEditingItem] = item;
     } else {
@@ -686,7 +747,6 @@ function saveCatItem() {
   renderCatEditor();
 }
 
-// ── Suppression / déplacement items ──────────────────────────
 function deleteCatItem(gi, ii) {
   if (!confirm('Supprimer ce service ?')) return;
   var cat = loadCat();
@@ -705,7 +765,6 @@ function moveCatItem(gi, ii, dir) {
   renderCatEditor();
 }
 
-// ── Groupes ───────────────────────────────────────────────────
 function addCatGroup() {
   $('cat-group-name-input').value = '';
   $('cat-group-modal').classList.add('open');
@@ -765,7 +824,6 @@ function exportCatalogue() {
   a.click();
 }
 
-// Sync Firebase → catalogue
 function syncCatalogueFromFirebase() {
   if (!db) return;
   db.collection('config').doc('catalogue').get()
