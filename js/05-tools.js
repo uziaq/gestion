@@ -10,11 +10,9 @@
 var _emailDocPdfB64 = null;
 
 function sendDocByEmail() {
-  // Récupérer l'email du client si connu
   var doc = _currentDocForEmail;
   var defaultEmail = doc && doc.ce ? doc.ce : '';
   $('send-to-email').value = defaultEmail;
-  // Message par défaut
   var tpl = loadTemplate();
   var type = doc && doc.type === 'facture' ? 'facture' : 'devis';
   var num  = doc ? doc.num : '';
@@ -31,7 +29,6 @@ async function confirmSendEmail() {
     showSendStatus('error', 'Email invalide.');
     return;
   }
-  // Tenter une dernière init si pas encore prêt
   if (!_ejsReady) initEmailJS();
   if (!_ejsReady) {
     showSendStatus('error', 'Service email non disponible. Rechargez la page et réessayez.');
@@ -43,7 +40,6 @@ async function confirmSendEmail() {
   btn.textContent = 'Génération PDF…';
 
   try {
-    // Générer le PDF depuis le contenu affiché dans le modal
     var pdfB64 = await generatePdfBase64();
     btn.textContent = 'Envoi en cours…';
 
@@ -89,7 +85,6 @@ function showSendStatus(type, msg) {
 }
 
 async function generatePdfBase64() {
-  // Utiliser jsPDF + html2canvas pour capturer le document
   var el = $('preview');
   if (!el) throw new Error('Aperçu non disponible');
 
@@ -102,24 +97,21 @@ async function generatePdfBase64() {
 
   var { jsPDF } = window.jspdf;
   var pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
-  var imgW = 210; // A4 width mm
+  var imgW = 210;
   var imgH = (canvas.height * imgW) / canvas.width;
-  var pageH = 297; // A4 height mm
+  var pageH = 297;
   var pos = 0;
 
-  // Gestion multi-pages si le doc est long
   while (pos < imgH) {
     if (pos > 0) pdf.addPage();
     pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, -pos, imgW, imgH);
     pos += pageH;
   }
 
-  // Retourner en base64 sans le prefixe data:
   var b64 = pdf.output('datauristring');
   return b64.split(',')[1];
 }
 
-// Banner in-app (fallback ou iOS qui bloque Notification API)
 function showNotifBanner(icon, title, msg) {
   $('notif-icon').textContent = icon;
   $('notif-title').textContent = title;
@@ -157,7 +149,6 @@ function buildConfirmMsg(rdv) {
   if (rdv.lieu)  lignes.push('📍 ' + rdv.lieu);
   if (rdv.title) lignes.push('🔧 ' + rdv.title);
   lignes.push('');
-  // Infos véhicule du RDV (priorité au véhicule sélectionné, sinon premier)
   if (cl) {
     var vehs2 = cl.vehs && cl.vehs.length ? cl.vehs : (cl.vm ? [{vm:cl.vm,vmo:cl.vmo||'',vmot:cl.vmot||'',van:cl.van||''}] : []);
     var selV = (rdv.vehIdx !== null && rdv.vehIdx !== undefined && vehs2[rdv.vehIdx]) ? vehs2[rdv.vehIdx] : vehs2[0];
@@ -184,11 +175,9 @@ function copyConfirmMsg(rdvId) {
   if (!rdv) return;
   var msg = buildConfirmMsg(rdv);
 
-  // Copier dans le presse-papier
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(msg).then(function() {
       showNotifBanner('📋', 'Message copié !', 'Colle-le dans WhatsApp ou SMS.');
-      // Mettre à jour le bouton visuellement
       document.querySelectorAll('.rdv-confirm-btn').forEach(function(btn) {
         if (btn.getAttribute('onclick') && btn.getAttribute('onclick').includes(rdvId)) {
           btn.textContent = '✓ Copié !';
@@ -214,13 +203,11 @@ function fallbackCopy(text) {
     document.execCommand('copy');
     showNotifBanner('📋', 'Message copié !', 'Colle-le dans WhatsApp ou SMS.');
   } catch(e) {
-    // Afficher le message dans une alerte pour copie manuelle
     prompt('Copie ce message :', text);
   }
   document.body.removeChild(ta);
 }
 
-// Aperçu du message de confirmation (dans le modal RDV)
 function previewConfirmMsg(rdvId) {
   if (!rdvId) return '';
   var rdv = loadRdvs().find(function(r){ return r.id === rdvId; });
@@ -248,10 +235,6 @@ function syncRdvsFromFirebase() {
 }
 
 // ============================================================
-//  TABS (complet avec agenda)
-// ============================================================
-
-// ============================================================
 //  STATUT RAPIDE
 // ============================================================
 function toggleStatusDropdown(e, docId) {
@@ -260,11 +243,9 @@ function toggleStatusDropdown(e, docId) {
   if (!dd) return;
   var pill = dd.parentElement;
   var isOpen = pill.classList.contains('open');
-  // Fermer tous les autres
   document.querySelectorAll('.status-pill.open').forEach(function(p){ p.classList.remove('open'); });
   if (!isOpen) pill.classList.add('open');
 }
-// Fermer les dropdowns au clic extérieur
 document.addEventListener('click', function() {
   document.querySelectorAll('.status-pill.open').forEach(function(p){ p.classList.remove('open'); });
 });
@@ -293,12 +274,10 @@ function duplicateDoc(docId) {
   var ech = new Date(); ech.setDate(ech.getDate() + 30);
   copy.ech = ech.toISOString().split('T')[0];
   copy.statut = 'envoyé';
-  // Nouveau numéro
   var prefix = copy.type === 'devis' ? 'DEV' : 'FAC';
   copy.num = genNum(prefix);
   docs.unshift(copy);
   saveDocs(docs);
-  // Charger dans le formulaire
   loadDoc(copy.id);
   showNotifBanner('⧉', 'Document dupliqué', copy.num + ' créé depuis ' + orig.num);
 }
@@ -317,9 +296,8 @@ function devisToFacture(docId) {
   facture.num = genNum('FAC');
   facture.date = today();
   facture.statut = 'envoyé';
-  facture.refDevis = devis.num; // référence au devis d'origine
+  facture.refDevis = devis.num;
   docs.unshift(facture);
-  // Marquer le devis comme accepté
   var devisIdx = docs.findIndex(function(d){ return d.id === docId; });
   if (devisIdx >= 0 && docs[devisIdx].statut === 'envoyé') docs[devisIdx].statut = 'accepté';
   saveDocs(docs);
@@ -339,7 +317,6 @@ function globalSearch(q) {
     return;
   }
   var results = [];
-  // Recherche dans les documents
   loadDocs().forEach(function(d) {
     var haystack = [d.num,d.cn,d.vm,d.vmo,d.vmot,d.vim,d.cv,d.type,d.statut].join(' ').toLowerCase();
     if (d.lines) d.lines.forEach(function(l){ haystack += ' ' + (l.label||'').toLowerCase(); });
@@ -350,7 +327,6 @@ function globalSearch(q) {
         action: 'loadDoc(' + d.id + ')' });
     }
   });
-  // Recherche dans les clients
   loadClients().forEach(function(cl) {
     var vehs = cl.vehs && cl.vehs.length ? cl.vehs : (cl.vm?[{vm:cl.vm,vmo:cl.vmo||'',vim:cl.vim||''}]:[]);
     var haystack = [cl.nom,cl.tel,cl.email,cl.ville].join(' ').toLowerCase();
@@ -363,7 +339,6 @@ function globalSearch(q) {
         action: 'showClientHistory(' + cl.id + ')' });
     }
   });
-  // Recherche dans les RDVs
   loadRdvs().forEach(function(r) {
     var haystack = [r.title,r.lieu,r.notes].join(' ').toLowerCase();
     if (haystack.includes(q)) {
@@ -448,22 +423,32 @@ function showClientHistory(clientId) {
   $('client-history-modal').classList.add('open');
 }
 
-// Bouton historique depuis le carnet
 function clientHistoryBtn(id) { showClientHistory(id); }
 
 // ============================================================
-//  STATISTIQUES
+//  STATISTIQUES — gère période civile + glissante + comparaison N-1
 // ============================================================
 function renderStats() {
-  var period = parseInt($('stats-period') ? $('stats-period').value : '6') || 0;
-  var docs = loadDocs();
+  var periodRaw = $('stats-period') ? $('stats-period').value : '6';
+  var allDocsRef = loadDocs();
   var now = new Date();
+  var docs;
+  var prevDocs = null;
 
-  // Filtrer par période
-  if (period > 0) {
-    var cutoff = new Date(now);
-    cutoff.setMonth(cutoff.getMonth() - period);
-    docs = docs.filter(function(d){ return new Date(d.date) >= cutoff; });
+  // Détection : période civile vs glissante
+  var calendarPeriods = ['month','quarter','year','prev_month','prev_quarter','prev_year'];
+  if (calendarPeriods.indexOf(periodRaw) >= 0) {
+    docs = filterByPeriod(allDocsRef, periodRaw);
+    var prevMap = { month: 'prev_month', quarter: 'prev_quarter', year: 'prev_year' };
+    if (prevMap[periodRaw]) prevDocs = filterByPeriod(allDocsRef, prevMap[periodRaw]);
+  } else {
+    var period = parseInt(periodRaw) || 0;
+    docs = allDocsRef;
+    if (period > 0) {
+      var cutoff = new Date(now);
+      cutoff.setMonth(cutoff.getMonth() - period);
+      docs = docs.filter(function(d){ return new Date(d.date) >= cutoff; });
+    }
   }
 
   var factures = docs.filter(function(d){ return d.type==='facture'; });
@@ -474,8 +459,15 @@ function renderStats() {
   var convRate = devis.length > 0 ? Math.round((factures.length / devis.length) * 100) : 0;
   var panierMoyen = payees.length > 0 ? caTotal / payees.length : 0;
 
-  // KPIs
-  // Calcul frais et marge sur les docs filtrés
+  // Comparaison N-1 (période civile précédente équivalente)
+  var caTotalPrev = 0, evolutionLabel = null;
+  if (prevDocs) {
+    var prevPayees = prevDocs.filter(function(d){ return d.type==='facture' && d.statut==='payé'; });
+    caTotalPrev = prevPayees.reduce(function(s,d){ return s+(d.ttc||0); }, 0);
+    var diff = caTotalPrev > 0 ? Math.round(((caTotal - caTotalPrev) / caTotalPrev) * 100) : (caTotal > 0 ? 100 : 0);
+    evolutionLabel = (diff >= 0 ? '+' : '') + diff + '% vs période précédente (' + fmt(caTotalPrev) + ')';
+  }
+
   var totalFrais = docs.reduce(function(s,d){ return s + (d.fraisTotal || calcFraisTotal(d.frais||{})); }, 0);
   var margeNette = caTotal - totalFrais;
   var nbDeclare  = docs.filter(function(d){ return d.declare !== false; }).length;
@@ -483,7 +475,7 @@ function renderStats() {
 
   var kpis = $('stats-kpis');
   if (kpis) kpis.innerHTML = [
-    { val: fmt(caTotal),     lbl: 'CA encaissé' },
+    { val: fmt(caTotal),     lbl: 'CA encaissé', sub: evolutionLabel },
     { val: fmt(caAttente),   lbl: 'En attente' },
     { val: fmt(totalFrais),  lbl: 'Frais totaux' },
     { val: fmt(margeNette),  lbl: 'Marge nette', color: margeNette >= 0 ? 'var(--green)' : 'var(--red)' },
@@ -491,12 +483,13 @@ function renderStats() {
     { val: fmt(panierMoyen), lbl: 'Panier moyen' },
     { val: nbDeclare + '',   lbl: 'Déclarés', color: 'var(--green)' },
     { val: nbNonDecl + '',   lbl: 'Non déclarés', color: nbNonDecl > 0 ? 'var(--orange)' : 'var(--text-dim)' },
-    { val: fmt(caTotal * 0.226), lbl: 'Cotis. estimées (22,6%)' },
+    { val: fmt(caTotal * 0.212), lbl: 'URSSAF estimée (21,2%)', sub: 'Voir onglet Fiscalité' },
   ].map(function(k) {
-    return '<div class="kpi-item"><div class="kpi-val" style="color:'+(k.color||'var(--blue)')+'">'+k.val+'</div><div class="kpi-lbl">'+k.lbl+'</div></div>';
+    return '<div class="kpi-item"><div class="kpi-val" style="color:'+(k.color||'var(--blue)')+'">'+k.val+'</div><div class="kpi-lbl">'+k.lbl+'</div>'
+      + (k.sub ? '<div style="font-size:10px;color:var(--text-muted);margin-top:3px">'+k.sub+'</div>' : '')
+    + '</div>';
   }).join('');
 
-  // Graphique CA par mois
   var mois6 = [];
   for (var i = 5; i >= 0; i--) {
     var d = new Date(now);
@@ -527,7 +520,6 @@ function renderStats() {
     return '<div class="bar-col"><div class="bar-val">' + (mo.cnt>0?mo.cnt:'') + '</div><div class="bar-fill" style="height:'+h+'px;background:var(--green)"></div><div class="bar-label">' + mo.lbl + '</div></div>';
   }).join('');
 
-  // Prestations les plus vendues
   var prestCount = {};
   allDocs.forEach(function(d) {
     (d.lines||[]).forEach(function(l) {
@@ -547,7 +539,6 @@ function renderStats() {
     + '</div>';
   }).join('') : '<div style="color:var(--text-muted);font-size:13px">Pas encore de données.</div>';
 
-  // Taux conversion
   var convEl = $('chart-conversion');
   if (convEl) convEl.innerHTML = '<div style="text-align:center">'
     + '<div style="font-family:var(--fh);font-size:48px;font-weight:700;color:' + (convRate>=50?'var(--green)':'var(--orange)') + '">' + convRate + '%</div>'
@@ -595,11 +586,12 @@ function exportCSV() {
 }
 
 // ============================================================
-//  TABS (complet)
+//  TABS — ajout onglet "fiscal"
 // ============================================================
 function showTab(t) {
-  ['dash','form','liste','carnet','template','services','agenda','stats','search'].forEach(function(x){ var el=$('t-'+x); if(el) el.classList.toggle('on',x===t); });
-  document.querySelectorAll('.nb').forEach(function(b,i){ b.classList.toggle('on',['dash','form','liste','carnet','template','services','agenda','stats','search'][i]===t); });
+  var tabs = ['dash','form','liste','carnet','template','services','agenda','stats','fiscal','search'];
+  tabs.forEach(function(x){ var el=$('t-'+x); if(el) el.classList.toggle('on',x===t); });
+  document.querySelectorAll('.nb').forEach(function(b,i){ b.classList.toggle('on',tabs[i]===t); });
   if(t==='dash')     renderDash();
   if(t==='liste')    renderListe();
   if(t==='carnet')   renderCarnet();
@@ -607,6 +599,7 @@ function showTab(t) {
   if(t==='services') renderCatEditor();
   if(t==='agenda')   renderAgenda();
   if(t==='stats')    renderStats();
+  if(t==='fiscal')   renderFiscal();
   if(t==='search')   { $('global-search').value=''; $('search-results').innerHTML='<div style="color:var(--text-muted);font-size:13px;text-align:center;padding:30px">Tape pour rechercher…</div>'; setTimeout(function(){ $('global-search').focus(); }, 100); }
 }
 
@@ -618,7 +611,6 @@ var _autoSaveTimer = null;
 var _lastSavedHash = '';
 
 function getFormHash() {
-  // Hash simple pour détecter les changements
   var obj = buildObj();
   return JSON.stringify(obj.lines) + obj.cn + obj.type + obj.notes + (obj.gains||'');
 }
@@ -660,7 +652,7 @@ function checkAndRestoreDraft() {
     var draft = JSON.parse(raw);
     if (!draft._isDraft || !draft.lines || !draft.lines.length) return;
     var age = Date.now() - (draft._savedAt || 0);
-    if (age > 24 * 3600000) { // Ignorer les drafts > 24h
+    if (age > 24 * 3600000) {
       localStorage.removeItem(AUTOSAVE_KEY);
       return;
     }
@@ -691,12 +683,10 @@ var _currentStatutFilter = '';
 function setListeFilter(type, btn) {
   _currentListeFilter = type;
   _currentStatutFilter = '';
-  // Reset tous les chips statut
   ['envoye','accepte','paye','impaye'].forEach(function(s) {
     var chip = $('fchip-'+s);
     if (chip) chip.className = 'filter-chip';
   });
-  // Activer le bon chip type
   ['all','devis','facture'].forEach(function(t) {
     var chip = $('fchip-'+t);
     if (chip) chip.className = 'filter-chip' + (t === (type||'all') ? ' active' : '');
@@ -710,12 +700,10 @@ function setStatutFilter(statut, btn) {
   var isActive = _currentStatutFilter === statut;
   _currentStatutFilter = isActive ? '' : statut;
   _currentListeFilter = '';
-  // Reset chips type
   ['all','devis','facture'].forEach(function(t) {
     var chip = $('fchip-'+t);
     if (chip) chip.className = 'filter-chip' + (t === 'all' ? ' active' : '');
   });
-  // Activer/désactiver chip statut
   var colorMap = { 'envoyé':'', 'accepté':'active', 'payé':'active-green', 'impayé':'active-red active-orange' };
   ['envoye','accepte','paye','impaye'].forEach(function(s) {
     var chipStatut = { 'envoye':'envoyé', 'accepte':'accepté', 'paye':'payé', 'impaye':'impayé' }[s];
@@ -750,17 +738,13 @@ function updateListeFilterCounts() {
 // ══════════════════════════════════════════════════════════════
 function startRdvsRealtimeSync() {
   if (!db || !syncOk) return;
-  // Remplacer le one-shot get par un listener temps réel
   db.collection('rdvs').doc('all').onSnapshot(function(doc) {
     if (doc.exists && doc.data().rdvs) {
       localStorage.setItem(RDV_KEY, JSON.stringify(doc.data().rdvs));
-      // Rafraîchir l'agenda si ouvert
       if ($('t-agenda') && $('t-agenda').classList.contains('on')) {
         renderCalendar();
         renderSideEvents(calSelected);
       }
-      // Reprogrammer les rappels : annuler tous les timers et relancer
-      // (les rdvs peuvent avoir été modifiés depuis un autre appareil)
       cancelAllRdvTimers();
       doc.data().rdvs.forEach(function(r){ scheduleRdvNotif(r); });
       runRappelCheck();
@@ -778,16 +762,13 @@ var _gKeyTimer = null;
 
 function initKeyboardShortcuts() {
   document.addEventListener('keydown', function(e) {
-    // Ignorer si dans un input/textarea/select
     var tag = (e.target.tagName || '').toLowerCase();
     if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
-    // Ignorer si modal ouverte (sauf Echap)
     var modalOpen = document.querySelector('.rdv-modal.open, .olsx-modal.open, .wa-modal.open');
 
     var key = e.key;
     var ctrl = e.ctrlKey || e.metaKey;
 
-    // Fermer modaux avec Echap
     if (key === 'Escape') {
       document.querySelectorAll('.rdv-modal.open, .olsx-modal.open, .shortcuts-modal.open, .client-history-modal.open').forEach(function(m) {
         m.classList.remove('open');
@@ -797,7 +778,6 @@ function initKeyboardShortcuts() {
 
     if (modalOpen) return;
 
-    // Ctrl+S — Sauvegarder
     if (ctrl && key === 's') {
       e.preventDefault();
       if ($('t-form') && $('t-form').classList.contains('on')) {
@@ -806,13 +786,11 @@ function initKeyboardShortcuts() {
       }
       return;
     }
-    // Ctrl+P — Aperçu/Imprimer
     if (ctrl && key === 'p') {
       e.preventDefault();
       if ($('t-form') && $('t-form').classList.contains('on')) printDoc();
       return;
     }
-    // Ctrl+E — Envoyer par email
     if (ctrl && (key === 'e' || key === 'E')) {
       e.preventDefault();
       if ($('t-form') && $('t-form').classList.contains('on')) {
@@ -821,30 +799,25 @@ function initKeyboardShortcuts() {
       }
       return;
     }
-    // Ctrl+K — Recherche globale
     if (ctrl && key === 'k') {
       e.preventDefault();
       showTab('search');
       setTimeout(function(){ $('global-search') && $('global-search').focus(); }, 100);
       return;
     }
-    // Ctrl++ — Ajouter une ligne prestation
     if (ctrl && (key === '+' || key === '=')) {
       e.preventDefault();
       if ($('t-form') && $('t-form').classList.contains('on')) addLine();
       return;
     }
-    // ? — Raccourcis
     if (key === '?') {
       $('shortcuts-modal').classList.add('open');
       return;
     }
-    // N — Nouveau devis
     if (key === 'n' || key === 'N') {
       newDoc();
       return;
     }
-    // Navigation G+lettre (type Gmail)
     if (key === 'g' || key === 'G') {
       _gKeyPressed = true;
       clearTimeout(_gKeyTimer);
@@ -860,6 +833,7 @@ function initKeyboardShortcuts() {
         'c': 'carnet', 'C': 'carnet',
         'a': 'agenda', 'A': 'agenda',
         's': 'stats', 'S': 'stats',
+        'f': 'fiscal', 'F': 'fiscal',
       };
       if (navMap[key]) { showTab(navMap[key]); return; }
     }
@@ -914,10 +888,8 @@ function calcFraisTotal(frais) {
 function calcFrais() {
   var frais = getFraisObj();
   var total = calcFraisTotal(frais);
-  // Afficher le total
   var dispEl = $('frais-total-display');
   if (dispEl) dispEl.textContent = fmt(total);
-  // Calculer la marge nette
   var ttc = parseFloat(($('t-ttc') ? $('t-ttc').textContent : '0').replace(',','.').replace(' €','').replace(' ','')) || 0;
   var marge = ttc - total;
   var margeEl = $('frais-marge-val');
