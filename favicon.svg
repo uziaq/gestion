@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="6" fill="#0d0e10"/>
+  <!-- Logo AP stylisé AREPROG : A triangulaire + P avec jambe -->
+  <!-- Basé sur la forme réelle du logo -->
+  <!-- Jambe diagonale gauche du A -->
+  <polygon points="7,24 11.5,10 14,14.5 11,24" fill="white"/>
+  <!-- Jambe diagonale droite du A vers le P -->
+  <polygon points="14,14.5 16.5,10 22,10 22,13 17,13 14.5,18" fill="white"/>
+  <!-- Arc du P -->
+  <path d="M17,10 Q24,10 24,16 Q24,22 17,22 L15,22 L15,24 L12.5,24 L12.5,18 L17,18 Q21,18 21,16 Q21,13 17,13 Z" fill="white"/>
+  <!-- Triangle creux du A -->
+  <polygon points="11.5,10 16.5,10 14,14.5" fill="#0d0e10"/>
+</svg>
