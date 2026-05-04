@@ -439,10 +439,20 @@ function plusDays(n) {
   d.setDate(d.getDate() + n);
   return d.toISOString().split('T')[0];
 }
+// FIX bug : numérotation par max+1 (pas par count) pour éviter les doublons après suppression
 function genNum(prefix) {
   const y = new Date().getFullYear();
-  const cnt = loadDocs().filter(d => d.num && d.num.startsWith(prefix + '-' + y)).length;
-  return prefix + '-' + y + '-' + String(cnt + 1).padStart(3, '0');
+  const docs = loadDocs();
+  let max = 0;
+  docs.forEach(d => {
+    if (!d.num) return;
+    const m = d.num.match(new RegExp('^' + prefix + '-' + y + '-(\\d+)$'));
+    if (m) {
+      const n = parseInt(m[1], 10);
+      if (n > max) max = n;
+    }
+  });
+  return prefix + '-' + y + '-' + String(max + 1).padStart(3, '0');
 }
 
 // ============================================================
