@@ -64,7 +64,7 @@ function initLineAutocomplete(inputEl, lid) {
       lbl.textContent = s.label;
       var pr = document.createElement('span');
       pr.className = 'ac-price';
-      pr.textContent = s.price > 0 ? s.price.toFixed(2) + ' €' : '';
+      pr.textContent = s.price > 0 ? s.price.toFixed(2) + ' €' : '';
       item.appendChild(lbl);
       item.appendChild(pr);
       (function(suggestion) {
@@ -91,7 +91,7 @@ function initLineAutocomplete(inputEl, lid) {
       var puInp = row.querySelectorAll('input[type="number"]')[1];
       if (puInp) puInp.value = line.pu.toFixed(2);
       var ltVal = row.querySelector('.lt-val');
-      if (ltVal && !line.offert) ltVal.textContent = (line.qte * line.pu).toFixed(2) + ' €';
+      if (ltVal && !line.offert) ltVal.textContent = (line.qte * line.pu).toFixed(2) + ' €';
     }
     calcTotaux();
   }
@@ -148,7 +148,7 @@ function renderLines() {
     div.innerHTML =
       '<input type="text" class="line-label-input" placeholder="Désignation…" value="' + (line.label || '').replace(/"/g,'&quot;') + '" autocomplete="off" autocorrect="off" spellcheck="false"/>' +
       '<div class="lf lf-qte"><span class="lf-lbl">Qté</span><input type="number" min="1" step="1" value="' + line.qte + '" onchange="lineField(this,' + line.id + ',\'qte\')"' + disabledAttr + '/></div>' +
-      '<div class="lf lf-pu"><span class="lf-lbl">PU HT</span><input type="number" min="0" step="0.01" value="' + line.pu.toFixed(2) + '" onchange="lineField(this,' + line.id + ',\'pu\')"' + (isOffert ? ' style="opacity:.4"' : '') + disabledAttr + '/></div>' +
+      '<div class="lf lf-pu"><span class="lf-lbl">PU HT</span><input type="number" min="0" step="0.01" value="' + line.pu.toFixed(2) + '" onchange="lineField(this,' + line.id + ',\'pu\')"' + (isOffert ? ' style="opacity:.4"' : '') + disabledAttr + '/></div>' +
       '<label class="lf lf-offert" title="Offert"><span class="lf-lbl">Offert</span><input type="checkbox"' + (isOffert ? ' checked' : '') + ' onchange="lineOffert(this,' + line.id + ')" style="width:18px;height:18px;accent-color:var(--green);cursor:pointer"/></label>' +
       '<div class="lt"><span class="lf-lbl">Total</span><span class="lt-val" style="color:' + (isOffert ? 'var(--green)' : '') + '">' + total + '</span></div>' +
       '<button class="rm-line" onclick="removeLine(' + line.id + ')" title="Supprimer">×</button>';
@@ -189,7 +189,7 @@ function lineField(inp, lid, field) {
   if (!line) return;
   line[field] = parseFloat(inp.value) || 0;
   var row = inp.closest('.line-row');
-  row.querySelector('.lt-val').textContent = (line.qte * line.pu).toFixed(2) + ' €';
+  row.querySelector('.lt-val').textContent = (line.qte * line.pu).toFixed(2) + ' €';
   calcTotaux();
 }
 
@@ -285,7 +285,7 @@ function renderAcompteHTML(doc, ac) {
   var accentColor = sanitizeCssColor(tpl.color || '#1E90FF');
   var vehStr = [escHtml(doc.vm||''), escHtml(doc.vmo||''), escHtml(doc.vmot||''), doc.van?'('+escHtml(doc.van)+')':''].filter(Boolean).join(' ');
   var linesHTML = (doc.lines||[]).filter(function(l){return !l.offert;}).map(function(l){
-    return '<tr><td>'+escHtml(l.label||'—')+'</td><td style="text-align:center">'+l.qte+'</td><td style="text-align:right">'+(l.pu||0).toFixed(2)+' €</td><td style="text-align:right"><strong>'+((l.qte||1)*(l.pu||0)).toFixed(2)+' €</strong></td></tr>';
+    return '<tr><td>'+escHtml(l.label||'—')+'</td><td style="text-align:center">'+l.qte+'</td><td style="text-align:right">'+(l.pu||0).toFixed(2)+' €</td><td style="text-align:right"><strong>'+((l.qte||1)*(l.pu||0)).toFixed(2)+' €</strong></td></tr>';
   }).join('');
   return '<style>'
     + 'body,*{font-family:Arial,sans-serif;font-size:13px;color:#1a1a1a;box-sizing:border-box}'
@@ -316,20 +316,20 @@ function renderAcompteHTML(doc, ac) {
         + '<div class="ai">'+escHtml(tpl.activite||'')+(tpl.tel?'<br>'+escHtml(tpl.tel):'')+(tpl.email?'<br>'+escHtml(tpl.email):'')+'</div></div>'
       + '<div><div class="at">REÇU D’ACOMPTE</div>'
         + '<div class="an">Réf. '+escHtml(doc.num||'—')+'</div>'
-        + '<div class="an">Date : '+fmtDate(ac.date)+'</div></div>'
+        + '<div class="an">Date : '+fmtDate(ac.date)+'</div></div>'
     + '</div>'
     + '<div class="ap">'
       + '<div><div class="apl">Prestataire</div><div class="apn">'+escHtml(tpl.nom||'AREPROG')+'</div>'
         + '<div class="api">'+escHtml(tpl.activite||'')+(tpl.adresse?'<br>'+escHtml(tpl.adresse):'')+(tpl.tel?'<br>'+escHtml(tpl.tel):'')+(tpl.email?'<br>'+escHtml(tpl.email):'')+(tpl.legal?'<br><small style="color:#aaa">'+escHtml(tpl.legal)+'</small>':'')+'</div></div>'
       + '<div><div class="apl">Client</div><div class="apn">'+escHtml(doc.cn||'—')+'</div>'
-        + '<div class="api">'+(doc.ca?escHtml(doc.ca)+'<br>':'')+escHtml(doc.cv||'')+(doc.ct?'<br>'+escHtml(doc.ct):'')+(doc.ce?'<br>'+escHtml(doc.ce):'')+(vehStr?'<br><br><strong>Véhicule :</strong> '+vehStr:'')+(doc.vim?'<br>Immat. : <strong>'+escHtml(doc.vim.toUpperCase())+'</strong>':'')+'</div></div>'
+        + '<div class="api">'+(doc.ca?escHtml(doc.ca)+'<br>':'')+escHtml(doc.cv||'')+(doc.ct?'<br>'+escHtml(doc.ct):'')+(doc.ce?'<br>'+escHtml(doc.ce):'')+(vehStr?'<br><br><strong>Véhicule :</strong> '+vehStr:'')+(doc.vim?'<br>Immat. : <strong>'+escHtml(doc.vim.toUpperCase())+'</strong>':'')+'</div></div>'
     + '</div>'
-    + (linesHTML?'<table class="adt"><thead><tr><th>Désignation</th><th style="text-align:center">Qté</th><th style="text-align:right">PU HT</th><th style="text-align:right">Total HT</th></tr></thead><tbody>'+linesHTML+'</tbody></table>':'')
+    + (linesHTML?'<table class="adt"><thead><tr><th>Désignation</th><th style="text-align:center">Qté</th><th style="text-align:right">PU HT</th><th style="text-align:right">Total HT</th></tr></thead><tbody>'+linesHTML+'</tbody></table>':'')
     + '<div class="abox"><div class="abox-t">Détail de l’acompte</div>'
-      + '<div class="ar"><span>Total TTC du document</span><span>'+(ac.ttc||0).toFixed(2)+' €</span></div>'
-      + '<div class="ar big"><span>Acompte reçu</span><span>'+(ac.montant||0).toFixed(2)+' €</span></div>'
+      + '<div class="ar"><span>Total TTC du document</span><span>'+(ac.ttc||0).toFixed(2)+' €</span></div>'
+      + '<div class="ar big"><span>Acompte reçu</span><span>'+(ac.montant||0).toFixed(2)+' €</span></div>'
       + '<div class="ar"><span>Mode de paiement</span><span>'+escHtml(ac.mode||'')+'</span></div>'
-      + '<div class="ar solde"><span>Solde restant à régler</span><span>'+(ac.solde||0).toFixed(2)+' €</span></div>'
+      + '<div class="ar solde"><span>Solde restant à régler</span><span>'+(ac.solde||0).toFixed(2)+' €</span></div>'
     + '</div>'
     + '<div class="sig">'
       + '<div class="sig-b"><div class="sig-l">Signature prestataire</div><div style="height:60px"></div></div>'
@@ -354,6 +354,11 @@ function calcTotaux() {
   $('t-ht').textContent = fmt(ht);
   $('t-tva').textContent = fmt(ht * tvaRate);
   $('t-ttc').textContent = fmt(ht * (1 + tvaRate));
+  // FIX bug autosave : déclenche onFormChange depuis calcTotaux pour capturer
+  // les changements qté/PU/offert qui ne passent pas par onFormChange directement
+  if (typeof onFormChange === 'function' && $('t-form') && $('t-form').classList.contains('on')) {
+    onFormChange();
+  }
 }
 
 // ============================================================
