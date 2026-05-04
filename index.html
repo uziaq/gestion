@@ -57,6 +57,7 @@
       <button class="nb" onclick="showTab('services')">⚙️ Services</button>
       <button class="nb" onclick="showTab('agenda')">📅 Agenda</button>
       <button class="nb" onclick="showTab('stats')">📊 Stats</button>
+      <button class="nb" onclick="showTab('fiscal')">💰 Fiscalité</button>
       <button class="nb" onclick="showTab('search')">🔍 Recherche</button>
     </div>
   </div>
@@ -72,7 +73,6 @@
 
     <!-- DASHBOARD -->
     <div class="tc on" id="t-dash">
-      <!-- Recherche rapide -->
       <div class="search-bar">
         <span class="search-icon">🔍</span>
         <input type="text" id="dash-search" placeholder="Rechercher un client, véhicule, numéro de document…" oninput="dashQuickSearch(this.value)"/>
@@ -80,10 +80,8 @@
       </div>
       <div id="dash-search-results" style="display:none"></div>
 
-      <!-- Stats -->
       <div class="stats-row" id="stats"></div>
 
-      <!-- Actions rapides -->
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px" id="quick-actions">
         <button class="btn-p" onclick="newDoc()" style="padding:12px;flex-direction:column;display:flex;align-items:center;gap:4px;font-size:12px">
           <span style="font-size:20px">📄</span>Nouveau devis
@@ -183,8 +181,6 @@
         </div>
       </div>
 
-      <!-- gains-bar supprimé — géré dans le champ f-gains -->
-
       <div class="lines-wrap">
         <div class="card-title">Prestations</div>
         <div class="lines-head">
@@ -247,7 +243,6 @@
         </div>
       </div>
       <div class="agenda-layout">
-        <!-- Calendrier -->
         <div class="agenda-cal">
           <div class="agenda-cal-head">
             <div class="agenda-cal-title" id="cal-month-label">—</div>
@@ -259,14 +254,11 @@
           </div>
           <div class="cal-grid" id="cal-grid"></div>
         </div>
-        <!-- Sidebar -->
         <div class="agenda-side">
-          <!-- Événements du jour sélectionné -->
           <div class="agenda-today-card">
             <div class="agenda-today-title" id="side-date-label">Aujourd'hui</div>
             <div id="side-events"><div style="color:var(--text-muted);font-size:13px">Aucun événement</div></div>
           </div>
-          <!-- Alertes auto -->
           <div class="alert-card">
             <div class="agenda-today-title">⚠️ Alertes</div>
             <div id="auto-alerts"><div style="color:var(--text-muted);font-size:13px">Chargement…</div></div>
@@ -281,17 +273,25 @@
         <div class="sh-title">Statistiques</div>
         <div style="display:flex;gap:8px">
           <select id="stats-period" onchange="renderStats()" style="padding:8px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:13px">
-            <option value="3">3 derniers mois</option>
-            <option value="6" selected>6 derniers mois</option>
-            <option value="12">12 derniers mois</option>
-            <option value="0">Tout l'historique</option>
+            <optgroup label="Période civile">
+              <option value="month">Ce mois (calendaire)</option>
+              <option value="quarter">Ce trimestre (calendaire)</option>
+              <option value="year">Cette année (calendaire)</option>
+              <option value="prev_month">Mois dernier</option>
+              <option value="prev_quarter">Trimestre dernier</option>
+              <option value="prev_year">Année dernière</option>
+            </optgroup>
+            <optgroup label="Glissant">
+              <option value="3">3 derniers mois</option>
+              <option value="6" selected>6 derniers mois</option>
+              <option value="12">12 derniers mois</option>
+              <option value="0">Tout l'historique</option>
+            </optgroup>
           </select>
           <button class="btn-s" onclick="exportCSV()">⬇ Export CSV</button>
         </div>
       </div>
-      <!-- KPIs -->
       <div class="kpi-grid" id="stats-kpis" style="margin-bottom:20px"></div>
-      <!-- Graphiques -->
       <div class="stats-chart-row">
         <div class="chart-card">
           <div class="chart-card-title">CA mensuel (€)</div>
@@ -314,6 +314,9 @@
       </div>
     </div>
 
+    <!-- FISCALITÉ — rendu dynamique par renderFiscal() dans js/06-fiscal.js -->
+    <div class="tc" id="t-fiscal"></div>
+
     <!-- RECHERCHE -->
     <div class="tc" id="t-search">
       <div class="sh">
@@ -327,14 +330,12 @@
         <div style="color:var(--text-muted);font-size:13px;text-align:center;padding:30px">Tape pour rechercher…</div>
       </div>
 
-      <!-- SECTION FRAIS -->
       <div class="frais-section" id="frais-section">
         <div class="frais-title">
           <span>💸 Mes frais sur cette intervention</span>
           <span class="frais-total-val" id="frais-total-display">0,00 €</span>
         </div>
         <div class="frais-grid">
-          <!-- Carburant / Déplacement -->
           <div class="frais-card">
             <div class="frais-card-title">⛽ Carburant & déplacement</div>
             <div class="frais-row">
@@ -353,7 +354,6 @@
               <span style="font-size:11px;color:var(--text-muted)">€</span>
             </div>
           </div>
-          <!-- Matériel / Consommables -->
           <div class="frais-card">
             <div class="frais-card-title">🔧 Matériel & consommables</div>
             <div class="frais-row">
@@ -367,7 +367,6 @@
               <span style="font-size:11px;color:var(--text-muted)">€</span>
             </div>
           </div>
-          <!-- Péages -->
           <div class="frais-card">
             <div class="frais-card-title">🛣️ Péages</div>
             <div class="frais-row">
@@ -381,7 +380,6 @@
               <span style="font-size:11px;color:var(--text-muted)">€</span>
             </div>
           </div>
-          <!-- Repas -->
           <div class="frais-card">
             <div class="frais-card-title">🍽️ Repas</div>
             <div class="frais-row">
@@ -396,7 +394,6 @@
             </div>
           </div>
         </div>
-        <!-- Marge nette -->
         <div class="frais-marge" id="frais-marge-bar">
           <div class="frais-marge-label">Marge nette estimée (TTC − frais)</div>
           <div class="frais-marge-val" id="frais-marge-val">—</div>
@@ -445,7 +442,6 @@
       </div>
       <div class="fg2">
         <div>
-          <!-- Entreprise -->
           <div class="card" style="margin-bottom:16px">
             <div class="card-title">Votre entreprise</div>
             <div class="fr"><label>Nom affiché (en-tête)</label><input id="tpl-nom" type="text" placeholder="AREPROG"/></div>
@@ -457,14 +453,12 @@
             <div class="fr"><label>Adresse (optionnel)</label><input id="tpl-adresse" type="text" placeholder=""/></div>
             <div class="fr"><label>Mentions légales (SIRET, TVA...)</label><textarea id="tpl-legal" rows="2" placeholder="SIRET : 000 000 000 00000 · TVA non applicable"></textarea></div>
           </div>
-          <!-- Pied de page -->
           <div class="card" style="margin-bottom:16px">
             <div class="card-title">Pied de page</div>
             <div class="fr"><label>Texte du pied de page</label><textarea id="tpl-footer" rows="3" placeholder="AREPROG — Reprogrammation moteur à domicile..."></textarea></div>
           </div>
         </div>
         <div>
-          <!-- Style -->
           <div class="card" style="margin-bottom:16px">
             <div class="card-title">Couleur & style</div>
             <div class="fr"><label>Couleur principale</label>
@@ -487,7 +481,6 @@
               </select>
             </div>
           </div>
-          <!-- Options doc -->
           <div class="card" style="margin-bottom:16px">
             <div class="card-title">Options du document</div>
             <div class="fr"><label class="tpl-toggle"><input type="checkbox" id="tpl-show-gains" checked/> Afficher l'encart gains/bénéfices</label></div>
@@ -505,7 +498,6 @@
               <input type="number" id="tpl-validite" value="30" min="1" max="365" placeholder="30"/>
             </div>
           </div>
-          <!-- Aperçu mini -->
           <div class="card">
             <div class="card-title">Aperçu live</div>
             <div style="background:#f0f2f5;border-radius:8px;padding:12px;max-height:320px;overflow-y:auto">
@@ -534,10 +526,17 @@
         <div style="width:1px;height:20px;background:var(--border);margin:0 4px"></div>
         <select id="flt-period" onchange="renderListe()" style="padding:5px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:12px">
           <option value="">Toute période</option>
-          <option value="7">7 derniers jours</option>
-          <option value="30">Ce mois</option>
-          <option value="90">Ce trimestre</option>
-          <option value="365">Cette année</option>
+          <optgroup label="Période civile">
+            <option value="month">Ce mois (calendaire)</option>
+            <option value="quarter">Ce trimestre (calendaire)</option>
+            <option value="year">Cette année (calendaire)</option>
+          </optgroup>
+          <optgroup label="Glissant">
+            <option value="7">7 derniers jours</option>
+            <option value="30">30 derniers jours</option>
+            <option value="90">90 derniers jours</option>
+            <option value="365">365 derniers jours</option>
+          </optgroup>
         </select>
         <input type="hidden" id="flt" value=""/>
         <input type="hidden" id="flt-statut" value=""/>
@@ -887,6 +886,8 @@ Cordialement, AREPROG"></textarea>
     <div class="shortcut-row"><span class="shortcut-desc">Dashboard</span><div class="shortcut-keys"><span class="kbd">G</span><span class="kbd">D</span></div></div>
     <div class="shortcut-row"><span class="shortcut-desc">Mes documents</span><div class="shortcut-keys"><span class="kbd">G</span><span class="kbd">L</span></div></div>
     <div class="shortcut-row"><span class="shortcut-desc">Agenda</span><div class="shortcut-keys"><span class="kbd">G</span><span class="kbd">A</span></div></div>
+    <div class="shortcut-row"><span class="shortcut-desc">Stats</span><div class="shortcut-keys"><span class="kbd">G</span><span class="kbd">S</span></div></div>
+    <div class="shortcut-row"><span class="shortcut-desc">Fiscalité</span><div class="shortcut-keys"><span class="kbd">G</span><span class="kbd">F</span></div></div>
     <div class="shortcut-row"><span class="shortcut-desc">Recherche</span><div class="shortcut-keys"><span class="kbd">Ctrl</span>+<span class="kbd">K</span></div></div>
     <div class="shortcut-row"><span class="shortcut-desc">Fermer / Annuler</span><div class="shortcut-keys"><span class="kbd">Echap</span></div></div>
     <div class="shortcut-row"><span class="shortcut-desc">Ce panneau</span><div class="shortcut-keys"><span class="kbd">?</span></div></div>
@@ -914,6 +915,7 @@ Cordialement, AREPROG"></textarea>
 <script src="/js/03-render.js"></script>
 <script src="/js/04-agenda.js"></script>
 <script src="/js/05-tools.js"></script>
+<script src="/js/06-fiscal.js"></script>
 
 <script>
 // Service Worker pour notifications en arrière-plan (optionnel)
