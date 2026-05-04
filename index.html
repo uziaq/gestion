@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="robots" content="noindex, nofollow"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AREPROG — Devis & Factures</title>
+<!-- PWA Manifest pour installation iOS/Android -->
+<link rel="manifest" href="/manifest.json"/>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg"/>
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png"/>
+<link rel="icon" type="image/png" sizes="512x512" href="/favicon-512.png"/>
+<link rel="apple-touch-icon" href="/apple-touch-icon.png"/>
+<link rel="shortcut icon" href="/favicon.ico"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="AREPROG"/>
+<meta name="theme-color" content="#0a0c10"/>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"/>
+<link rel="stylesheet" href="/css/styles.css"/>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">ARE<span>PROG</span></div>
+    <div class="login-sub">Espace professionnel</div>
+    <div class="lf"><label>Email</label><input id="l-email" type="email" placeholder="" autocomplete="email"/></div>
+    <div class="lf"><label>Mot de passe</label><input id="l-pass" type="password" placeholder="••••••••" autocomplete="current-password"/></div>
+    <button class="login-btn" id="login-btn" onclick="if(typeof doLogin==='function')doLogin()">Se connecter →</button>
+    <div class="login-err" id="lerr" style="display:none"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="topbar">
+    <div class="topbar-row1">
+      <div class="tb-brand">ARE<span>PROG</span></div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <button onclick="$('shortcuts-modal').classList.add('open')" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text-dim);cursor:pointer;font-size:14px;font-weight:700" title="Raccourcis clavier (?)">?</button>
+        <button class="logout-btn" onclick="doLogout()">Déconnexion</button>
+      </div>
+    </div>
+    <div class="tb-nav">
+      <button class="nb on" onclick="showTab('dash')">Dashboard</button>
+      <button class="nb" onclick="newDoc()">+ Nouveau</button>
+      <button class="nb" onclick="showTab('liste')">Documents</button>
+      <button class="nb" onclick="showTab('carnet')">👥 Clients</button>
+      <button class="nb" onclick="showTab('template')">🎨 Template</button>
+      <button class="nb" onclick="showTab('services')">⚙️ Services</button>
+      <button class="nb" onclick="showTab('agenda')">📅 Agenda</button>
+      <button class="nb" onclick="showTab('stats')">📊 Stats</button>
+      <button class="nb" onclick="showTab('search')">🔍 Recherche</button>
+    </div>
+  </div>
+  <!-- Barre statut sync Firebase -->
+  <div class="sync-bar" id="sync-bar">
+    <div class="sync-dot" id="sync-dot"></div>
+    <span id="sync-status">Connexion Firebase…</span>
+    <span style="margin-left:auto;color:var(--text-muted);font-size:10px" id="sync-last"></span>
+    <span style="color:var(--text-muted);font-size:10px;margin-left:8px" id="rappel-heartbeat" title="Dernière vérification des rappels RDV"></span>
+  </div>
+
+  <div class="main">
+
+    <!-- DASHBOARD -->
+    <div class="tc on" id="t-dash">
+      <!-- Recherche rapide -->
+      <div class="search-bar">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="dash-search" placeholder="Rechercher un client, véhicule, numéro de document…" oninput="dashQuickSearch(this.value)"/>
+        <button class="btn-s" style="font-size:11px;padding:5px 10px;flex-shrink:0" onclick="showTab('search')">Tout voir →</button>
+      </div>
+      <div id="dash-search-results" style="display:none"></div>
+
+      <!-- Stats -->
+      <div class="stats-row" id="stats"></div>
+
+      <!-- Actions rapides -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px" id="quick-actions">
+        <button class="btn-p" onclick="newDoc()" style="padding:12px;flex-direction:column;display:flex;align-items:center;gap:4px;font-size:12px">
+          <span style="font-size:20px">📄</span>Nouveau devis
+        </button>
+        <button class="btn-s" onclick="newDoc();$('f-type').value='facture';onTypeChange()" style="padding:12px;flex-direction:column;display:flex;align-items:center;gap:4px;font-size:12px">
+          <span style="font-size:20px">🧾</span>Nouvelle facture
+        </button>
+        <button class="btn-s" onclick="showTab('agenda');setTimeout(function(){openRdvModal(null)},100)" style="padding:12px;flex-direction:column;display:flex;align-items:center;gap:4px;font-size:12px">
+          <span style="font-size:20px">📅</span>Nouveau RDV
+        </button>
+        <button class="btn-s" onclick="showTab('carnet');setTimeout(function(){openAddClientModal()},100)" style="padding:12px;flex-direction:column;display:flex;align-items:center;gap:4px;font-size:12px">
+          <span style="font-size:20px">👤</span>Nouveau client
+        </button>
+      </div>
+
+      <div class="sh">
+        <div class="sh-title">Documents récents</div>
+        <div style="display:flex;gap:8px">
+          <select id="dash-filter-statut" onchange="renderDash()" style="padding:6px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:12px">
+            <option value="">Tous statuts</option>
+            <option value="envoyé">Envoyés</option>
+            <option value="accepté">Acceptés</option>
+            <option value="payé">Payés</option>
+            <option value="annulé">Annulés</option>
+          </select>
+          <button class="btn-p" onclick="newDoc()">+ Nouveau</button>
+        </div>
+      </div>
+      <div id="dash-list"></div>
+    </div>
+
+    <!-- FORM -->
+    <div class="tc" id="t-form">
+      <div class="sh">
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <div class="sh-title" id="form-h">Nouveau devis</div>
+          <div class="autosave-bar" id="autosave-bar">
+            <div class="autosave-dot"></div>
+            <span id="autosave-label">Prêt</span>
+          </div>
+        </div>
+        <div class="sh-actions">
+          <button class="btn-s" onclick="openCarnetModal()">👥 Carnet clients</button>
+          <button class="btn-s" onclick="openOlsxModal()">⚡ Gains OLSX</button>
+          <button class="btn-s" onclick="newDoc()">↺ Réinitialiser</button>
+          <button class="btn-s" onclick="openPreview()">👁 Aperçu</button>
+          <button class="btn-s" onclick="openAcompteModal()">💶 Acompte</button>
+          <button class="btn-p" onclick="printDoc()">🖨 Imprimer / PDF</button>
+          <button class="btn-g" onclick="saveDoc()">💾 Enregistrer</button>
+        </div>
+      </div>
+
+      <div class="fg3">
+        <div class="card">
+          <div class="card-title">Document</div>
+          <div class="fr"><label>Type</label>
+            <select id="f-type" onchange="onTypeChange();onFormChange()">
+              <option value="devis">Devis</option>
+              <option value="facture">Facture</option>
+            </select>
+          </div>
+          <div class="fr"><label>Numéro</label><input id="f-num" type="text"/></div>
+          <div class="fr"><label>Date d'émission</label><input id="f-date" type="date"/></div>
+          <div class="fr"><label>Validité / Échéance</label><input id="f-ech" type="date"/></div>
+          <div class="fr"><label>Statut</label>
+            <select id="f-statut">
+              <option value="envoyé">Envoyé</option>
+              <option value="accepté">Accepté</option>
+              <option value="payé">Payé ✓</option>
+              <option value="annulé">Annulé</option>
+            </select>
+          </div>
+          <div class="fr"><label>Déclaration fiscale</label>
+            <div class="decl-toggle">
+              <button type="button" class="decl-btn active-decl" id="decl-oui" onclick="setDeclaration(true)">✓ Déclaré</button>
+              <button type="button" class="decl-btn" id="decl-non" onclick="setDeclaration(false)">⚠ Non déclaré</button>
+            </div>
+          </div>
+          <input type="hidden" id="f-declare" value="true"/>
+        </div>
+        <div class="card">
+          <div class="card-title">Client</div>
+          <div class="fr"><label>Nom / Société</label><input id="f-cnom" type="text" oninput="onFormChange()" placeholder="Prénom NOM"/></div>
+          <div class="fr"><label>Adresse</label><input id="f-cadr" type="text" placeholder="10 rue des Lilas"/></div>
+          <div class="fr"><label>Ville + Code postal</label><input id="f-cville" type="text" placeholder="64100 Bayonne"/></div>
+          <div class="fr"><label>Téléphone</label><input id="f-ctel" type="text" placeholder="06 XX XX XX XX"/></div>
+          <div class="fr"><label>Email</label><input id="f-cemail" type="email" placeholder="client@email.fr"/></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Véhicule</div>
+          <div class="fr"><label>Marque</label><input id="f-vm" type="text" placeholder="Volkswagen"/></div>
+          <div class="fr"><label>Modèle</label><input id="f-vmo" type="text" placeholder="Golf 7 GTI"/></div>
+          <div class="fr"><label>Motorisation</label><input id="f-vmot" type="text" placeholder="2.0 TSI 220ch"/></div>
+          <div class="fr"><label>Année</label><input id="f-van" type="text" placeholder="2019"/></div>
+          <div class="fr"><label>Immatriculation</label><input id="f-vim" type="text" placeholder="AB-123-CD"/></div>
+          <div class="fr"><label>Kilométrage</label><input id="f-vkm" type="text" placeholder="45 000 km"/></div>
+        </div>
+      </div>
+
+      <!-- gains-bar supprimé — géré dans le champ f-gains -->
+
+      <div class="lines-wrap">
+        <div class="card-title">Prestations</div>
+        <div class="lines-head">
+          <span>Désignation</span>
+          <span style="text-align:center">Qté</span>
+          <span style="text-align:right">PU HT (€)</span>
+          <span style="text-align:center">Offert</span>
+          <span style="text-align:right">Total HT</span>
+          <span></span>
+        </div>
+        <div id="lines"></div>
+        <button class="add-line" onclick="addLine()">+ Ajouter une ligne</button>
+      </div>
+
+      <div class="fg2">
+        <div class="totaux-card">
+          <div class="card-title">Totaux</div>
+          <div class="totaux-row"><span class="tl">Total HT</span><span class="tv" id="t-ht">0,00 €</span></div>
+          <div class="totaux-row">
+            <span class="tl">TVA
+              <select class="tva-sel" id="f-tva" onchange="calcTotaux()">
+                <option value="0">0 % (non assujetti)</option>
+                <option value="20">20 %</option>
+              </select>
+            </span>
+            <span class="tv" id="t-tva">0,00 €</span>
+          </div>
+          <div class="totaux-row big"><span class="tl">TOTAL TTC</span><span class="tv" id="t-ttc">0,00 €</span></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Notes & conditions</div>
+          <div class="fr"><label>Mentions imprimées sur le document</label>
+            <textarea id="f-notes" rows="3" oninput="onFormChange()">Prestation réalisée à domicile. Garantie 2 ans. Reprogrammation 100% réversible. Paiement à réception. Devis valable 30 jours.</textarea>
+          </div>
+          <div class="fr"><label>Notes internes (non imprimées)</label>
+            <textarea id="f-nint" rows="2" placeholder="Mémo interne..."></textarea>
+          </div>
+        </div>
+        <div class="card" style="margin-top:16px">
+          <div class="card-title" style="display:flex;align-items:center;justify-content:space-between">
+            <span>Gains & bénéfices</span>
+            <button class="btn-s" style="font-size:11px;padding:4px 10px" onclick="prefillGains()" title="Pré-remplir depuis les prestations sélectionnées">↺ Auto</button>
+          </div>
+          <div class="fr">
+            <label>Un gain par ligne — affiché dans l'encart bleu du document</label>
+            <textarea id="f-gains" rows="6" placeholder="Ex :&#10;Meilleure réactivité moteur&#10;100% réversible&#10;−40% sur le carburant&#10;Agrément de conduite amélioré" oninput="previewGainsBadge()"></textarea>
+          </div>
+          <div id="gains-badge-preview" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AGENDA -->
+    <div class="tc" id="t-agenda">
+      <div class="sh">
+        <div class="sh-title">Agenda</div>
+        <div class="sh-actions">
+          <span class="push-badge" style="background:rgba(34,197,94,.1);color:var(--green)">📧 Rappels par email</span>
+          <button class="btn-p" onclick="openRdvModal(null)">+ Nouveau RDV</button>
+        </div>
+      </div>
+      <div class="agenda-layout">
+        <!-- Calendrier -->
+        <div class="agenda-cal">
+          <div class="agenda-cal-head">
+            <div class="agenda-cal-title" id="cal-month-label">—</div>
+            <div class="agenda-cal-nav">
+              <button class="cal-nav-btn" onclick="calPrev()">‹</button>
+              <button class="cal-nav-btn" onclick="calToday()">Auj.</button>
+              <button class="cal-nav-btn" onclick="calNext()">›</button>
+            </div>
+          </div>
+          <div class="cal-grid" id="cal-grid"></div>
+        </div>
+        <!-- Sidebar -->
+        <div class="agenda-side">
+          <!-- Événements du jour sélectionné -->
+          <div class="agenda-today-card">
+            <div class="agenda-today-title" id="side-date-label">Aujourd'hui</div>
+            <div id="side-events"><div style="color:var(--text-muted);font-size:13px">Aucun événement</div></div>
+          </div>
+          <!-- Alertes auto -->
+          <div class="alert-card">
+            <div class="agenda-today-title">⚠️ Alertes</div>
+            <div id="auto-alerts"><div style="color:var(--text-muted);font-size:13px">Chargement…</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STATS -->
+    <div class="tc" id="t-stats">
+      <div class="sh">
+        <div class="sh-title">Statistiques</div>
+        <div style="display:flex;gap:8px">
+          <select id="stats-period" onchange="renderStats()" style="padding:8px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:13px">
+            <option value="3">3 derniers mois</option>
+            <option value="6" selected>6 derniers mois</option>
+            <option value="12">12 derniers mois</option>
+            <option value="0">Tout l'historique</option>
+          </select>
+          <button class="btn-s" onclick="exportCSV()">⬇ Export CSV</button>
+        </div>
+      </div>
+      <!-- KPIs -->
+      <div class="kpi-grid" id="stats-kpis" style="margin-bottom:20px"></div>
+      <!-- Graphiques -->
+      <div class="stats-chart-row">
+        <div class="chart-card">
+          <div class="chart-card-title">CA mensuel (€)</div>
+          <div class="bar-chart" id="chart-ca"></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-card-title">Nombre de documents</div>
+          <div class="bar-chart" id="chart-docs"></div>
+        </div>
+      </div>
+      <div class="stats-chart-row">
+        <div class="chart-card">
+          <div class="chart-card-title">Prestations les plus vendues</div>
+          <div id="chart-prestations"></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-card-title">Taux conversion devis → facture</div>
+          <div id="chart-conversion" style="padding-top:10px"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RECHERCHE -->
+    <div class="tc" id="t-search">
+      <div class="sh">
+        <div class="sh-title">Recherche globale</div>
+      </div>
+      <div class="search-bar">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="global-search" placeholder="Nom, véhicule, immatriculation, numéro de devis, prestation…" oninput="globalSearch(this.value)" autofocus/>
+      </div>
+      <div id="search-results" class="search-results">
+        <div style="color:var(--text-muted);font-size:13px;text-align:center;padding:30px">Tape pour rechercher…</div>
+      </div>
+
+      <!-- SECTION FRAIS -->
+      <div class="frais-section" id="frais-section">
+        <div class="frais-title">
+          <span>💸 Mes frais sur cette intervention</span>
+          <span class="frais-total-val" id="frais-total-display">0,00 €</span>
+        </div>
+        <div class="frais-grid">
+          <!-- Carburant / Déplacement -->
+          <div class="frais-card">
+            <div class="frais-card-title">⛽ Carburant & déplacement</div>
+            <div class="frais-row">
+              <label>Kilomètres</label>
+              <input class="frais-input" id="f-km" type="number" min="0" step="1" placeholder="0" oninput="calcFrais()"/>
+              <span style="font-size:11px;color:var(--text-muted)">km</span>
+            </div>
+            <div class="frais-row">
+              <label>Taux km (€/km)</label>
+              <input class="frais-input" id="f-taux-km" type="number" min="0" step="0.01" value="0.40" oninput="calcFrais()"/>
+              <span style="font-size:11px;color:var(--text-muted)">€</span>
+            </div>
+            <div class="frais-row">
+              <label>Carburant direct</label>
+              <input class="frais-input" id="f-carburant" type="number" min="0" step="0.01" placeholder="0" oninput="calcFrais()"/>
+              <span style="font-size:11px;color:var(--text-muted)">€</span>
+            </div>
+          </div>
+          <!-- Matériel / Consommables -->
+          <div class="frais-card">
+            <div class="frais-card-title">🔧 Matériel & consommables</div>
+            <div class="frais-row">
+              <label>Matériel</label>
+              <input class="frais-input" id="f-materiel" type="number" min="0" step="0.01" placeholder="0" oninput="calcFrais()"/>
+              <span style="font-size:11px;color:var(--text-muted)">€</span>
+            </div>
+            <div class="frais-row">
+              <label>Consommables</label>
+              <input class="frais-input" id="f-consommables" type="number" min="0" step="0.01" placeholder="0" oninput="calcFrais()"/>
+              <span style="font-size:11px;color:var(--text-muted)">€</span>
+            </div>
+          </div>
+          <!-- Péages -->
+          <div class="frais-card">
+            <div class="frais-card-title">🛣️ Péages</div>
+            <div class="frais-row">
+              <label>Péages autoroute</label>
+              <input class="frais-input" id="f-peages" type="number" min="0" step="0.01" placeholder="0" oninput="calcFrais()"/>
+              <span style="font-size:11px;color:var(--text-muted)">€</span>
+            </div>
+            <div class="frais-row">
+              <label>Parking</label>
+              <input class="frais-input" id="f-parking" type="number" min="0" step="0.01" placeholder="0" oninput="calcFrais()"/>
+              <span style="font-size:11px;color:var(--text-muted)">€</span>
+            </div>
+          </div>
+          <!-- Repas -->
+          <div class="frais-card">
+            <div class="frais-card-title">🍽️ Repas</div>
+            <div class="frais-row">
+              <label>Repas</label>
+              <input class="frais-input" id="f-repas" type="number" min="0" step="0.01" placeholder="0" oninput="calcFrais()"/>
+              <span style="font-size:11px;color:var(--text-muted)">€</span>
+            </div>
+            <div class="frais-row">
+              <label>Hébergement</label>
+              <input class="frais-input" id="f-hebergement" type="number" min="0" step="0.01" placeholder="0" oninput="calcFrais()"/>
+              <span style="font-size:11px;color:var(--text-muted)">€</span>
+            </div>
+          </div>
+        </div>
+        <!-- Marge nette -->
+        <div class="frais-marge" id="frais-marge-bar">
+          <div class="frais-marge-label">Marge nette estimée (TTC − frais)</div>
+          <div class="frais-marge-val" id="frais-marge-val">—</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- CARNET -->
+    <div class="tc" id="t-carnet">
+      <div class="sh">
+        <div class="sh-title">Carnet clients & véhicules</div>
+        <button class="btn-p" onclick="openAddClientModal()">+ Nouveau client</button>
+      </div>
+      <div class="carnet-search">
+        <input id="carnet-search" type="text" placeholder="Rechercher un client, véhicule, immat..." oninput="renderCarnet()"/>
+      </div>
+      <div class="carnet-grid" id="carnet-grid"></div>
+    </div>
+
+    <!-- SERVICES -->
+    <div class="tc" id="t-services">
+      <div class="sh">
+        <div class="sh-title">Catalogue des services</div>
+        <div class="sh-actions">
+          <button class="btn-s" onclick="resetCatalogue()">↺ Réinitialiser</button>
+          <button class="btn-p" onclick="exportCatalogue()">⬇ Exporter</button>
+        </div>
+      </div>
+      <p style="color:var(--text-dim);font-size:13px;margin-bottom:18px">
+        Modifie le nom, le prix et l'organisation de tes services. Les changements s'appliquent immédiatement dans les formulaires de devis.
+      </p>
+      <div id="cat-editor"></div>
+      <button class="cat-add-group" onclick="addCatGroup()">+ Ajouter une catégorie</button>
+    </div>
+
+    <!-- TEMPLATE -->
+    <div class="tc" id="t-template">
+      <div class="sh">
+        <div class="sh-title">Modèle de document</div>
+        <div class="sh-actions">
+          <button class="btn-s" onclick="resetTemplate()">↺ Réinitialiser</button>
+          <button class="btn-p" onclick="openTemplateModal()">🔍 Aperçu plein écran</button>
+          <button class="btn-g" onclick="saveTemplate()">💾 Enregistrer</button>
+        </div>
+      </div>
+      <div class="fg2">
+        <div>
+          <!-- Entreprise -->
+          <div class="card" style="margin-bottom:16px">
+            <div class="card-title">Votre entreprise</div>
+            <div class="fr"><label>Nom affiché (en-tête)</label><input id="tpl-nom" type="text" placeholder="AREPROG"/></div>
+            <div class="fr"><label>Activité (sous le nom)</label><input id="tpl-activite" type="text" placeholder="Reprogrammation moteur à domicile"/></div>
+            <div class="fr"><label>Zones d'intervention</label><input id="tpl-zones" type="text" placeholder="Pays Basque (64) · Landes (40) · Yonne (89)"/></div>
+            <div class="fr"><label>Téléphone</label><input id="tpl-tel" type="text" placeholder="06 67 92 46 30"/></div>
+            <div class="fr"><label>Email</label><input id="tpl-email" type="text" placeholder="contact@areprog.fr"/></div>
+            <div class="fr"><label>Site web</label><input id="tpl-web" type="text" placeholder="areprog.fr"/></div>
+            <div class="fr"><label>Adresse (optionnel)</label><input id="tpl-adresse" type="text" placeholder=""/></div>
+            <div class="fr"><label>Mentions légales (SIRET, TVA...)</label><textarea id="tpl-legal" rows="2" placeholder="SIRET : 000 000 000 00000 · TVA non applicable"></textarea></div>
+          </div>
+          <!-- Pied de page -->
+          <div class="card" style="margin-bottom:16px">
+            <div class="card-title">Pied de page</div>
+            <div class="fr"><label>Texte du pied de page</label><textarea id="tpl-footer" rows="3" placeholder="AREPROG — Reprogrammation moteur à domicile..."></textarea></div>
+          </div>
+        </div>
+        <div>
+          <!-- Style -->
+          <div class="card" style="margin-bottom:16px">
+            <div class="card-title">Couleur & style</div>
+            <div class="fr"><label>Couleur principale</label>
+              <div class="tpl-color">
+                <input type="color" id="tpl-color-pick" value="#1E90FF" oninput="syncColorInput()"/>
+                <input type="text" id="tpl-color-hex" value="#1E90FF" oninput="syncColorPicker()" placeholder="#1E90FF"/>
+              </div>
+            </div>
+            <div class="fr"><label>Couleur du texte des titres</label>
+              <div class="tpl-color">
+                <input type="color" id="tpl-title-color-pick" value="#111111" oninput="syncTitleColorInput()"/>
+                <input type="text" id="tpl-title-color-hex" value="#111111" oninput="syncTitleColorPicker()" placeholder="#111111"/>
+              </div>
+            </div>
+            <div class="fr"><label>Afficher le logo texte</label>
+              <select id="tpl-logo-style">
+                <option value="split">Nom en deux couleurs (ARE + PROG)</option>
+                <option value="full">Nom en couleur principale</option>
+                <option value="plain">Nom en noir simple</option>
+              </select>
+            </div>
+          </div>
+          <!-- Options doc -->
+          <div class="card" style="margin-bottom:16px">
+            <div class="card-title">Options du document</div>
+            <div class="fr"><label class="tpl-toggle"><input type="checkbox" id="tpl-show-gains" checked/> Afficher l'encart gains/bénéfices</label></div>
+            <div class="fr"><label class="tpl-toggle"><input type="checkbox" id="tpl-show-veh" checked/> Afficher le véhicule chez le client</label></div>
+            <div class="fr"><label class="tpl-toggle"><input type="checkbox" id="tpl-show-footer" checked/> Afficher le pied de page</label></div>
+            <div class="fr"><label class="tpl-toggle"><input type="checkbox" id="tpl-show-legal" checked/> Afficher les mentions légales</label></div>
+            <div class="fr"><label>Intitulé colonne total</label>
+              <select id="tpl-col-total">
+                <option value="Total HT">Total HT</option>
+                <option value="Total TTC">Total TTC</option>
+                <option value="Montant">Montant</option>
+              </select>
+            </div>
+            <div class="fr"><label>Validité devis (jours)</label>
+              <input type="number" id="tpl-validite" value="30" min="1" max="365" placeholder="30"/>
+            </div>
+          </div>
+          <!-- Aperçu mini -->
+          <div class="card">
+            <div class="card-title">Aperçu live</div>
+            <div style="background:#f0f2f5;border-radius:8px;padding:12px;max-height:320px;overflow-y:auto">
+              <div id="tpl-mini-preview" style="background:#fff;border-radius:6px;padding:20px;font-size:10px;transform-origin:top left"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LISTE -->
+    <div class="tc" id="t-liste">
+      <div class="sh">
+        <div class="sh-title">Tous les documents</div>
+        <button class="btn-p" onclick="newDoc()">+ Nouveau</button>
+      </div>
+      <div class="filter-bar">
+        <button class="filter-chip active" id="fchip-all" onclick="setListeFilter('',this)">Tous <span class="filter-count" id="fcount-all"></span></button>
+        <button class="filter-chip" id="fchip-devis" onclick="setListeFilter('devis',this)">📄 Devis <span class="filter-count" id="fcount-devis"></span></button>
+        <button class="filter-chip" id="fchip-facture" onclick="setListeFilter('facture',this)">🧾 Factures <span class="filter-count" id="fcount-facture"></span></button>
+        <div style="width:1px;height:20px;background:var(--border);margin:0 4px"></div>
+        <button class="filter-chip" id="fchip-envoye" onclick="setStatutFilter('envoyé',this)">📤 Envoyés</button>
+        <button class="filter-chip" id="fchip-accepte" onclick="setStatutFilter('accepté',this)">👍 Acceptés</button>
+        <button class="filter-chip" id="fchip-paye" onclick="setStatutFilter('payé',this)">✅ Payés</button>
+        <button class="filter-chip" id="fchip-impaye" onclick="setStatutFilter('impayé',this)">⚠️ Impayés</button>
+        <div style="width:1px;height:20px;background:var(--border);margin:0 4px"></div>
+        <select id="flt-period" onchange="renderListe()" style="padding:5px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:12px">
+          <option value="">Toute période</option>
+          <option value="7">7 derniers jours</option>
+          <option value="30">Ce mois</option>
+          <option value="90">Ce trimestre</option>
+          <option value="365">Cette année</option>
+        </select>
+        <input type="hidden" id="flt" value=""/>
+        <input type="hidden" id="flt-statut" value=""/>
+      </div>
+      <div id="liste-body"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- MODAL OLSX SIMULATEUR -->
+<div class="olsx-modal" id="olsx-modal" onclick="if(event.target===this)closeOlsxModal()">
+  <div class="olsx-box">
+    <div class="olsx-toolbar">
+      <div>
+        <div class="olsx-toolbar-title">⚡ Simulateur OLSX — Gains moteur</div>
+        <div class="olsx-toolbar-hint">Sélectionne le véhicule dans le simulateur, puis clique "Importer les gains"</div>
+      </div>
+      <button class="btn-s" onclick="closeOlsxModal()">✕</button>
+    </div>
+    <iframe class="olsx-iframe" id="olsx-iframe"
+      src="https://api.olsx.eu/iframe?token=165|nY954hlsQT6tK8OLuaZtdtnj7zS0HYzBRIWsYYQk7966bc37&lang=fr&darkmode=on&color=sky&descriptions=on&currency=%E2%82%AC&hideprice=on&mailcontact=arthur%40areprog.fr"
+      allow="fullscreen" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox">
+    </iframe>
+    <div class="olsx-footer">
+      <div class="olsx-gains-preview" id="olsx-gains-preview">Aucun gain sélectionné</div>
+      <button class="btn-s" onclick="closeOlsxModal()">Annuler</button>
+      <button class="btn-g" id="olsx-import-btn" onclick="importOlsxGains()" style="display:none">✓ Importer les gains</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CARNET (sélection) -->
+<div class="carnet-modal" id="carnet-modal" onclick="if(event.target===this)closeCarnetModal()">
+  <div class="carnet-box">
+    <div class="carnet-box-title">👥 Choisir un client</div>
+    <div class="carnet-search">
+      <input id="carnet-modal-search" type="text" placeholder="Rechercher..." oninput="renderCarnetModal()"/>
+    </div>
+    <div class="carnet-grid" id="carnet-modal-grid" style="max-height:400px;overflow-y:auto"></div>
+    <div style="display:flex;justify-content:space-between;margin-top:16px;align-items:center">
+      <button class="btn-s" onclick="openAddClientModal()">+ Nouveau client</button>
+      <button class="btn-s" onclick="closeCarnetModal()">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL AJOUT CLIENT -->
+<div class="carnet-modal" id="add-client-modal" onclick="if(event.target===this)closeAddClientModal()">
+  <div class="carnet-box">
+    <div class="carnet-box-title" id="add-client-title">Nouveau client</div>
+    <div class="fg2" style="margin-bottom:0">
+      <div>
+        <div class="fr"><label>Nom / Société</label><input id="ac-nom" type="text" placeholder="Prénom NOM"/></div>
+        <div class="fr"><label>Téléphone</label><input id="ac-tel" type="text" placeholder="06 XX XX XX XX"/></div>
+        <div class="fr"><label>Email</label><input id="ac-email" type="email" placeholder="client@email.fr"/></div>
+        <div class="fr"><label>Adresse</label><input id="ac-adr" type="text" placeholder="10 rue des Lilas"/></div>
+        <div class="fr"><label>Ville + CP</label><input id="ac-ville" type="text" placeholder="64100 Bayonne"/></div>
+      </div>
+      <div>
+        <div class="fr" style="margin-bottom:6px">
+          <label>Véhicules</label>
+          <div id="ac-veh-list" class="veh-list"></div>
+          <button class="veh-add-btn" onclick="addVehicleRow()">+ Ajouter un véhicule</button>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px">
+      <button class="btn-s" onclick="closeAddClientModal()">Annuler</button>
+      <button class="btn-g" onclick="saveClient()">💾 Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ACOMPTE -->
+<div class="carnet-modal" id="acompte-modal" onclick="if(event.target===this)closeAcompteModal()">
+  <div class="carnet-box" style="max-width:460px;width:100%">
+    <div class="carnet-box-title">💶 Demande d'acompte</div>
+    <div style="background:var(--bg3);border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:13px;color:var(--text-muted)">Total TTC du document</span>
+      <span id="acomp-ttc" style="font-family:var(--fm);font-size:18px;font-weight:700;color:var(--blue)">0,00 €</span>
+    </div>
+    <div class="fr">
+      <label>Montant de l'acompte</label>
+      <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center">
+        <div style="position:relative">
+          <input type="number" id="acomp-pct" min="0" max="100" step="1" value="30" oninput="syncAcomptePct()" style="padding-right:26px;text-align:right"/>
+          <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:12px;pointer-events:none">%</span>
+        </div>
+        <span style="color:var(--text-muted);text-align:center;font-size:18px">⇄</span>
+        <div style="position:relative">
+          <input type="number" id="acomp-montant" min="0" step="0.01" oninput="syncAcompteMontant()" style="padding-right:22px;text-align:right"/>
+          <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:12px;pointer-events:none">€</span>
+        </div>
+      </div>
+    </div>
+    <div class="fr">
+      <label>Mode de paiement</label>
+      <select id="acomp-mode">
+        <option value="Virement bancaire">Virement bancaire</option>
+        <option value="Carte bancaire">Carte bancaire</option>
+        <option value="Espèces">Espèces</option>
+        <option value="Chèque">Chèque</option>
+        <option value="PayPal">PayPal</option>
+      </select>
+    </div>
+    <div class="fr">
+      <label>Date de réception</label>
+      <input type="date" id="acomp-date"/>
+    </div>
+    <div style="background:var(--bg3);border-radius:8px;padding:12px 16px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;border-left:3px solid var(--orange)">
+      <span style="font-size:13px;color:var(--text-muted)">Solde restant après acompte</span>
+      <span id="acomp-solde" style="font-family:var(--fm);font-size:16px;font-weight:600;color:var(--orange)">0,00 €</span>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap">
+      <button class="btn-s" onclick="closeAcompteModal()">Annuler</button>
+      <button class="btn-s" onclick="previewAcomptePDF()">👁 Aperçu preuve</button>
+      <button class="btn-g" onclick="validerAcompteRecu()">✓ Marquer reçu + PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL SÉLECTION VÉHICULE -->
+<div class="rdv-modal" id="veh-select-modal" onclick="if(event.target===this)$('veh-select-modal').classList.remove('open')" style="z-index:325">
+  <div class="rdv-box" style="max-width:440px">
+    <div class="rdv-box-title">🚗 Sélectionner un véhicule</div>
+    <div id="veh-select-list" class="veh-list" style="max-height:360px;overflow-y:auto"></div>
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px">
+      <button class="btn-s" onclick="$('veh-select-modal').classList.remove('open')">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL TEMPLATE PLEIN ÉCRAN -->
+<div class="tpl-modal" id="tpl-modal">
+  <div class="tpl-wrap">
+    <div class="tpl-panel">
+      <div class="tpl-panel-title">
+        🎨 Template
+        <button class="btn-s" onclick="closeTplModal()" style="font-size:12px">✕ Fermer</button>
+      </div>
+      <div style="flex:1;overflow-y:auto">
+        <div class="tpl-section">
+          <div class="tpl-section-title">Entreprise</div>
+          <div class="tpl-row"><label>Nom</label><input id="tpl2-nom" type="text" oninput="syncTpl('nom',this.value);livePreview()"/></div>
+          <div class="tpl-row"><label>Activité</label><input id="tpl2-activite" type="text" oninput="syncTpl('activite',this.value);livePreview()"/></div>
+          <div class="tpl-row"><label>Zones</label><input id="tpl2-zones" type="text" oninput="syncTpl('zones',this.value);livePreview()"/></div>
+          <div class="tpl-row"><label>Téléphone</label><input id="tpl2-tel" type="text" oninput="syncTpl('tel',this.value);livePreview()"/></div>
+          <div class="tpl-row"><label>Site web</label><input id="tpl2-web" type="text" oninput="syncTpl('web',this.value);livePreview()"/></div>
+          <div class="tpl-row"><label>Mentions légales</label><textarea id="tpl2-legal" rows="2" oninput="syncTpl('legal',this.value);livePreview()"></textarea></div>
+        </div>
+        <div class="tpl-section">
+          <div class="tpl-section-title">Style</div>
+          <div class="tpl-row"><label>Couleur principale</label>
+            <div class="tpl-color">
+              <input type="color" id="tpl2-color-pick" oninput="syncTpl('color',this.value);$('tpl2-color-hex').value=this.value;livePreview()"/>
+              <input type="text" id="tpl2-color-hex" oninput="syncTpl('color',this.value);$('tpl2-color-pick').value=this.value;livePreview()"/>
+            </div>
+          </div>
+          <div class="tpl-row"><label>Pied de page</label><textarea id="tpl2-footer" rows="3" oninput="syncTpl('footer',this.value);livePreview()"></textarea></div>
+        </div>
+      </div>
+      <div class="tpl-actions">
+        <button class="btn-s" onclick="resetTemplate();livePreview()">↺ Réinitialiser</button>
+        <button class="btn-g" onclick="saveTemplate();closeTplModal()">💾 Enregistrer & fermer</button>
+      </div>
+    </div>
+    <div class="tpl-preview-panel">
+      <div class="tpl-preview-bar">
+        <span class="tpl-preview-bar-title">Aperçu en direct</span>
+        <button class="btn-p" style="font-size:12px" onclick="printFromModal()">🖨 Imprimer</button>
+      </div>
+      <div class="tpl-preview-scroll">
+        <div class="tpl-preview-doc" id="tpl-live-preview"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ÉDITION SERVICE -->
+<div class="cat-modal" id="cat-item-modal" onclick="if(event.target===this)closeCatModal()">
+  <div class="cat-box">
+    <div class="cat-box-title" id="cat-modal-title">Modifier le service</div>
+    <div class="fr"><label>Nom du service</label>
+      <input id="cat-item-label" type="text" placeholder="Ex : Stage 1 — Reprogrammation moteur"/>
+    </div>
+    <div class="fr"><label>Prix indicatif (€ HT) — mettre 0 pour "Sur devis"</label>
+      <input id="cat-item-price" type="number" min="0" step="1" placeholder="330"/>
+    </div>
+    <div class="fr">
+      <label>Gains / bénéfices (un par ligne — affichés sur le devis)</label>
+      <textarea id="cat-item-gains" rows="4" placeholder="Ex :&#10;Meilleure réactivité moteur&#10;100% réversible&#10;Agrément de conduite amélioré"></textarea>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Ces gains apparaîtront dans l'encart bleu sur le devis/facture PDF</div>
+    </div>
+    <div class="fr"><label>Catégorie</label>
+      <select id="cat-item-group"></select>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px">
+      <button class="btn-s" onclick="closeCatModal()">Annuler</button>
+      <button class="btn-g" onclick="saveCatItem()">💾 Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL AJOUT CATÉGORIE -->
+<div class="cat-modal" id="cat-group-modal" onclick="if(event.target===this)$('cat-group-modal').classList.remove('open')">
+  <div class="cat-box">
+    <div class="cat-box-title">Nouvelle catégorie</div>
+    <div class="fr"><label>Nom de la catégorie</label>
+      <input id="cat-group-name-input" type="text" placeholder="Ex : Prestations spéciales"/>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px">
+      <button class="btn-s" onclick="$('cat-group-modal').classList.remove('open')">Annuler</button>
+      <button class="btn-g" onclick="confirmAddGroup()">✓ Créer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL RDV -->
+<div class="rdv-modal" id="rdv-modal" onclick="if(event.target===this)closeRdvModal()">
+  <div class="rdv-box">
+    <div class="rdv-box-title" id="rdv-modal-title">Nouveau rendez-vous</div>
+    <div class="fg2" style="margin-bottom:0">
+      <div>
+        <div class="fr"><label>Titre / Objet</label>
+          <input id="rdv-title" type="text" placeholder="Intervention Stage 1 — Golf 7"/>
+        </div>
+        <div class="fr"><label>Type</label>
+          <select id="rdv-type">
+            <option value="rdv">🔵 Rendez-vous client</option>
+            <option value="relance">🟡 Relance devis</option>
+            <option value="impaye">🔴 Relance facture impayée</option>
+            <option value="perso">🟣 Rappel personnel</option>
+          </select>
+        </div>
+        <div class="fr"><label>Date</label>
+          <input id="rdv-date" type="date"/>
+        </div>
+        <div class="fr"><label>Heure (optionnel)</label>
+          <input id="rdv-heure" type="time" placeholder="09:00"/>
+        </div>
+        <div class="fr">
+          <label style="display:flex;align-items:center;justify-content:space-between">
+            <span>Rappels par email</span>
+            <button type="button" class="btn-s" style="font-size:11px;padding:3px 8px" onclick="addRappelRow()">+ Ajouter</button>
+          </label>
+          <div id="rdv-rappels-list" style="display:flex;flex-direction:column;gap:6px;margin-top:6px"></div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:6px">📧 Un email sera envoyé à <a href="mailto:arthur@areprog.fr">arthur@areprog.fr</a></div>
+        </div>
+      </div>
+      <div>
+        <div class="fr"><label>Client lié (optionnel)</label>
+          <select id="rdv-client" onchange="updateRdvVehSelect()">
+            <option value="">— Aucun client —</option>
+          </select>
+        </div>
+        <div class="fr" id="rdv-veh-row" style="display:none">
+          <label>Véhicule concerné</label>
+          <select id="rdv-vehicule">
+            <option value="">— Tous les véhicules —</option>
+          </select>
+        </div>
+        <div class="fr"><label>Document lié (optionnel)</label>
+          <select id="rdv-doc">
+            <option value="">— Aucun document —</option>
+          </select>
+        </div>
+        <div class="fr"><label>Adresse / Lieu</label>
+          <input id="rdv-lieu" type="text" placeholder="12 rue des Pins, Bayonne"/>
+        </div>
+
+        <div class="fr"><label>Notes</label>
+          <textarea id="rdv-notes" rows="3" placeholder="Détails de l'intervention..."></textarea>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:18px">
+      <div style="display:flex;gap:8px">
+        <button class="btn-d" id="rdv-delete-btn" onclick="deleteRdvFromModal()" style="display:none">🗑 Supprimer</button>
+        <button class="rdv-confirm-btn" id="rdv-copy-btn" onclick="copyConfirmMsgFromModal()" style="display:none">📋 Copier message</button>
+      </div>
+      <div style="display:flex;gap:10px;margin-left:auto">
+        <button class="btn-s" onclick="closeRdvModal()">Annuler</button>
+        <button class="btn-g" onclick="saveRdv()">💾 Enregistrer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ENVOI EMAIL -->
+<div class="rdv-modal" id="send-email-modal" onclick="if(event.target===this)$('send-email-modal').classList.remove('open')" style="z-index:330">
+  <div class="rdv-box" style="max-width:420px">
+    <div class="rdv-box-title">📧 Envoyer par email</div>
+    <div class="fr">
+      <label>Email du client</label>
+      <input id="send-to-email" type="email" placeholder="client@email.fr" autocomplete="off"/>
+    </div>
+    <div class="fr">
+      <label>Message personnalisé (optionnel)</label>
+      <textarea id="send-message" rows="4" placeholder="Bonjour,
+
+Veuillez trouver ci-joint votre devis.
+
+Cordialement, AREPROG"></textarea>
+    </div>
+    <div id="send-email-status" style="display:none;padding:10px 14px;border-radius:8px;font-size:13px;margin-top:10px"></div>
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px">
+      <button class="btn-s" onclick="$('send-email-modal').classList.remove('open')">Annuler</button>
+      <button class="btn-g" id="send-email-confirm-btn" onclick="confirmSendEmail()">📧 Envoyer</button>
+    </div>
+  </div>
+</div>
+
+<!-- NOTIFICATION BANNER -->
+<div class="notif-banner" id="notif-banner">
+  <div class="notif-icon" id="notif-icon">🔔</div>
+  <div class="notif-body">
+    <div class="notif-title" id="notif-title">Rappel</div>
+    <div class="notif-msg" id="notif-msg"></div>
+  </div>
+  <button class="notif-close" onclick="closeNotifBanner()">×</button>
+</div>
+
+<!-- MODAL HISTORIQUE CLIENT -->
+<div class="client-history-modal" id="client-history-modal" onclick="if(event.target===this)$('client-history-modal').classList.remove('open')">
+  <div class="client-history-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+      <div class="sh-title" id="client-history-title">Historique client</div>
+      <button class="btn-s" onclick="$('client-history-modal').classList.remove('open')">✕ Fermer</button>
+    </div>
+    <div id="client-history-content"></div>
+  </div>
+</div>
+
+<!-- MODAL RACCOURCIS CLAVIER -->
+<div class="shortcuts-modal" id="shortcuts-modal" onclick="if(event.target===this)$('shortcuts-modal').classList.remove('open')">
+  <div class="shortcuts-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+      <div style="font-family:var(--fh);font-size:18px;font-weight:700">⌨️ Raccourcis clavier</div>
+      <button class="btn-s" onclick="$('shortcuts-modal').classList.remove('open')">✕</button>
+    </div>
+    <div class="shortcut-row"><span class="shortcut-desc">Nouveau devis</span><div class="shortcut-keys"><span class="kbd">N</span></div></div>
+    <div class="shortcut-row"><span class="shortcut-desc">Sauvegarder</span><div class="shortcut-keys"><span class="kbd">Ctrl</span>+<span class="kbd">S</span></div></div>
+    <div class="shortcut-row"><span class="shortcut-desc">Aperçu / Imprimer</span><div class="shortcut-keys"><span class="kbd">Ctrl</span>+<span class="kbd">P</span></div></div>
+    <div class="shortcut-row"><span class="shortcut-desc">Envoyer par email</span><div class="shortcut-keys"><span class="kbd">Ctrl</span>+<span class="kbd">E</span></div></div>
+    <div class="shortcut-row"><span class="shortcut-desc">Ajouter une ligne</span><div class="shortcut-keys"><span class="kbd">Ctrl</span>+<span class="kbd">+</span></div></div>
+    <div class="shortcut-row"><span class="shortcut-desc">Dashboard</span><div class="shortcut-keys"><span class="kbd">G</span><span class="kbd">D</span></div></div>
+    <div class="shortcut-row"><span class="shortcut-desc">Mes documents</span><div class="shortcut-keys"><span class="kbd">G</span><span class="kbd">L</span></div></div>
+    <div class="shortcut-row"><span class="shortcut-desc">Agenda</span><div class="shortcut-keys"><span class="kbd">G</span><span class="kbd">A</span></div></div>
+    <div class="shortcut-row"><span class="shortcut-desc">Recherche</span><div class="shortcut-keys"><span class="kbd">Ctrl</span>+<span class="kbd">K</span></div></div>
+    <div class="shortcut-row"><span class="shortcut-desc">Fermer / Annuler</span><div class="shortcut-keys"><span class="kbd">Echap</span></div></div>
+    <div class="shortcut-row"><span class="shortcut-desc">Ce panneau</span><div class="shortcut-keys"><span class="kbd">?</span></div></div>
+  </div>
+</div>
+
+<!-- MODAL APERÇU -->
+<div id="modal" onclick="if(event.target===this)closeModal()">
+  <div class="modal-wrap">
+    <div class="modal-toolbar">
+      <button class="btn-p" onclick="printFromModal()">🖨️ Imprimer / PDF</button>
+      <button class="btn-p" id="send-email-btn" onclick="sendDocByEmail()" style="background:#25d366">📧 Envoyer par email</button>
+      <button class="btn-s" onclick="closeModal()">✕ Fermer</button>
+    </div>
+    <div class="modal-inner">
+      <div class="preview-body" id="preview"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Application scripts (chargés en cascade, ordre important) -->
+<script src="/js/firebase-config.js"></script>
+<script src="/js/app.js"></script>
+
+<script>
+// Service Worker pour notifications en arrière-plan (optionnel)
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js')
+    .then(function(reg) { console.log('SW enregistré', reg.scope); })
+    .catch(function(err) { console.warn('SW non enregistré:', err); });
+}
+</script>
+</body>
+</html>
